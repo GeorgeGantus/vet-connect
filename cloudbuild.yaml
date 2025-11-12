@@ -45,7 +45,7 @@ steps:
   #
 
   # Step 4: Install frontend dependencies.
-  - name: 'gcr.io/cloud-builders/npm'
+  - name: 'gcr.io/cloud-builders/npm:20'
     id: 'Install Frontend Dependencies'
     args: ['install']
     dir: 'client' # Specifies the directory to run the command in.
