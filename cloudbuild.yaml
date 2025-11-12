@@ -69,7 +69,7 @@ steps:
       - 'storage'
       - 'rsync'
       - '-R'
-      - 'client/build' # Source: your frontend's build output folder.
+      - 'client/dist' # Source: your frontend's build output folder.
       - 'gs://vetconnect-frontend-bucket' # Destination bucket.
 
 # Tell Cloud Build to store the built image.
