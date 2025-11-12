@@ -23,3 +23,4 @@ EXPOSE 8080
 # The command to start your server.
 # Replace 'server.js' with your actual entry file (e.g., index.js).
 CMD [ "node", "index.js" ]
+CMD ["sh", "-c", "npm run migrate && npm start"]
