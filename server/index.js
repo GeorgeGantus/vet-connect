@@ -9,7 +9,7 @@ const productsRouter = require('./routes/products');
 const authenticate = require('./middleware/authenticate');
 
 const app = express();
-const port = 5000; // Choose a port
+const port = process.env.PORT || 5000; // Choose a port
 
 // Middleware to parse JSON bodies
 app.use(express.json());
