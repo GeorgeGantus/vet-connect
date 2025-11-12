@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "build:gcp": "cross-env VITE_PUBLIC_URL=/vetconnect-frontend-bucket/ npm run build"
+    "build:gcp": "cross-env VITE_PUBLIC_URL=/vetconnect-frontend-bucket npm run build"
 
     
   },
