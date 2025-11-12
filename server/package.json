@@ -5,9 +5,10 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon index.js",
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "migrate": "knex migrate:latest",
     "knex:migrate:make": "knex migrate:make -x js",
-    "knex:migrate:latest": "knex migrate:latest",
     "knex:migrate:rollback": "knex migrate:rollback"
   },
   "keywords": [],
@@ -22,6 +23,7 @@
     "knex": "^3.1.0",
     "multer": "^2.0.2",
     "nodemon": "^3.1.10",
+    "pg": "^8.16.3",
     "sqlite3": "^5.1.7"
   }
 }
