@@ -14,7 +14,7 @@ steps:
       - 'build'
       - '-t'
       - 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/vetconnect-repo/vetconnect-backend:$COMMIT_SHA'
-      - './src/server' # Path to the backend directory containing the Dockerfile
+      - './server' # Path to the backend directory containing the Dockerfile
 
   # Step 2: Push the Docker image to Google Artifact Registry.
   # This makes the image available for Cloud Run to use.
@@ -48,13 +48,13 @@ steps:
   - name: 'gcr.io/cloud-builders/npm'
     id: 'Install Frontend Dependencies'
     args: ['install']
-    dir: 'src/client' # Specifies the directory to run the command in.
+    dir: 'client' # Specifies the directory to run the command in.
 
   # Step 5: Build the static frontend assets.
   - name: 'gcr.io/cloud-builders/npm'
     id: 'Build Frontend'
     args: ['run', 'build']
-    dir: 'src/client'
+    dir: 'client'
 
   # Step 6: Sync the built assets to the Cloud Storage bucket.
   # 'rsync' is efficient; it only copies new or changed files.
@@ -65,7 +65,7 @@ steps:
       - 'storage'
       - 'rsync'
       - '-R'
-      - 'src/client/build' # Source: your frontend's build output folder.
+      - 'client/build' # Source: your frontend's build output folder.
       - 'gs://vetconnect-frontend-bucket' # Destination bucket.
 
 # Tell Cloud Build to store the built image.
