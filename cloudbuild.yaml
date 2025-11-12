@@ -71,3 +71,6 @@ steps:
 # Tell Cloud Build to store the built image.
 images:
   - 'southamerica-east1-docker.pkg.dev/$PROJECT_ID/vetconnect-repo/vetconnect-backend:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
