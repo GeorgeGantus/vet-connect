@@ -48,7 +48,7 @@ steps:
   - name: 'node:20'
     id: 'Install Frontend Dependencies'
     entrypoint: 'npm'
-    args: ['install']
+    args: ['ci']
     dir: 'client' # Specifies the directory to run the command in.
 
   # Step 5: Build the static frontend assets.
