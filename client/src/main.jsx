@@ -9,7 +9,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     {/* The basename should be the subdirectory where your app is hosted.
         Using an environment variable makes it flexible for different environments. */}
-    <BrowserRouter basename={import.meta.env.VITE_PUBLIC_URL}>
+    <BrowserRouter>
       <AuthProvider>
         <App />
       </AuthProvider>
