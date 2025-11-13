@@ -25,14 +25,14 @@ router.post('/register', async (req, res) => {
     const password_hash = await bcrypt.hash(password, 12);
 
     // Save the new user to the database
-    const [id] = await db('users').insert({
+    const [idItem] = await db('users').insert({
       name,
       email,
       phone_number,
       password_hash,
       role: role || 'veterinarian', // Default role if not provided
     }).returning('id');
-
+    const id = idItem.id || idItem; // Handle different return formats
     const [newUser] = await db('users')
       .where({ id })
       .select('id', 'name', 'email', 'phone_number', 'role');
