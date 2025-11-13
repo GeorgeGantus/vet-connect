@@ -46,10 +46,10 @@ router.post('/register', async (req, res) => {
       role: newUser.role,
     };
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: '1d', // Token expires in 1 day
-    });
-
+    //const token = jwt.sign(payload, process.env.JWT_SECRET, {
+    //  expiresIn: '1d', // Token expires in 1 day
+    //});
+    token = 'TEMPORARY_TOKEN_FOR_DEMO_PURPOSES';
     res.status(201).json({
       message: `Welcome ${newUser.email}! Your registration was successful.`,
       token,
