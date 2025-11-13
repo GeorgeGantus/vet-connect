@@ -8,66 +8,58 @@ const router = express.Router();
 // --- User Registration ---
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
+  const { name, email, password, role, phone_number } = req.body;
+
+  if (!name || !email || !password || !phone_number) {
+    return res.status(400).json({ message: 'Name, email, password, and phone number are required.' });
+  }
+
+  // Validate the user role
+  const allowedRoles = ['veterinarian', 'vendor'];
+  if (role && !allowedRoles.includes(role)) {
+    return res.status(400).json({ message: `Invalid role. Role must be one of: ${allowedRoles.join(', ')}.` });
+  }
+
   try {
-    const { name, email, password, role, phone_number } = req.body;
-    console.log("here 1")
-    if (!name || !email || !password || !phone_number) {
-      return res.status(400).json({ message: 'Name, email, password, and phone number are required.' });
-    }
-    console.log("here 2")
-    // Validate the user role
-    const allowedRoles = ['veterinarian', 'vendor'];
-    if (role && !allowedRoles.includes(role)) {
-      return res.status(400).json({ message: `Invalid role. Role must be one of: ${allowedRoles.join(', ')}.` });
-    }
-    console.log("here 3")
-    try {
-      // Hash the password
-      const password_hash = await bcrypt.hash(password, 12);
-      console.log("here 4");
-      // Save the new user to the database
-      const [id] = await db('users').insert({
-        name,
-        email,
-        phone_number,
-        password_hash,
-        role: role || 'veterinarian', // Default role if not provided
-      });
-      console.log("here 5");
-      const [newUser] = await db('users')
-        .where({ id })
-        .select('id', 'name', 'email', 'phone_number', 'role');
-      console.log("here 6");
-      // --- Generate JWT Token ---
-      const payload = {
-        userId: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        phone_number: newUser.phone_number,
-        role: newUser.role,
-      };
-      console.log("here 7");
-      const token = jwt.sign(payload, process.env.JWT_SECRET, {
-        expiresIn: '1d', // Token expires in 1 day
-      });
-      console.log("here 8");
-      res.status(201).json({
-        message: `Welcome ${newUser.email}! Your registration was successful.`,
-        token,
-      });
-    } catch (error) {
-      console.log("here 9", error);
-      // Handle case where email is already taken
-      if (error.code === 'SQLITE_CONSTRAINT') {
-        console.log("here 10");
-        return res.status(409).json({ message: 'Uma conta com este email já existe.' });
-      }
-      console.log("here 11");
-      res.status(500).json({ message: 'Erro ao registrar novo usuário.', error });
-    }
+    // Hash the password
+    const password_hash = await bcrypt.hash(password, 12);
+
+    // Save the new user to the database
+    const [id] = await db('users').insert({
+      name,
+      email,
+      phone_number,
+      password_hash,
+      role: role || 'veterinarian', // Default role if not provided
+    });
+
+    const [newUser] = await db('users')
+      .where({ id })
+      .select('id', 'name', 'email', 'phone_number', 'role');
+
+    // --- Generate JWT Token ---
+    const payload = {
+      userId: newUser.id,
+      name: newUser.name,
+      email: newUser.email,
+      phone_number: newUser.phone_number,
+      role: newUser.role,
+    };
+
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: '1d', // Token expires in 1 day
+    });
+
+    res.status(201).json({
+      message: `Welcome ${newUser.email}! Your registration was successful.`,
+      token,
+    });
   } catch (error) {
-    console.log("here catch", error);
-    return res.status(201).json({ message: 'Internal server error.' });
+    // Handle case where email is already taken
+    if (error.code === 'SQLITE_CONSTRAINT') {
+      return res.status(409).json({ message: 'Uma conta com este email já existe.' });
+    }
+    res.status(500).json({ message: 'Erro ao registrar novo usuário.', error });
   }
 });
 
