@@ -8,9 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "build:gcp": "cross-env VITE_PUBLIC_URL=/vetconnect-frontend-bucket npm run build"
-
-    
+  "build:gcp": "cross-env VITE_API_URL=https://vetconnect-backend-1045845178053.southamerica-east1.run.app npm run build"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
