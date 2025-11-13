@@ -31,7 +31,7 @@ router.post('/register', async (req, res) => {
       phone_number,
       password_hash,
       role: role || 'veterinarian', // Default role if not provided
-    });
+    }).returning('id');
 
     const [newUser] = await db('users')
       .where({ id })
