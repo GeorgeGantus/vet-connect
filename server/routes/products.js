@@ -1,28 +1,32 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const db = require('../db/db-config');
 const authenticate = require('../middleware/authenticate');
 const authorize = require('../middleware/authorize');
+const { Storage } = require('@google-cloud/storage');
 
 const router = express.Router();
 
-// --- Multer Configuration for Product Image Uploads ---
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    // Resolve path to be relative to this file's directory, going up to the project root
-    // and then into the client's public upload folder.
-    const uploadPath = path.resolve(__dirname, '..', '..', 'client', 'public', 'uploads', 'products');
-    fs.mkdirSync(uploadPath, { recursive: true }); // Ensure directory exists
-    cb(null, uploadPath);
-  },
-  filename: function (req, file, cb) {
-    // Create a unique filename to avoid overwrites
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
+// --- Google Cloud Storage Configuration ---
+// Initialize GCS Storage. It will automatically use credentials
+// from the environment (GOOGLE_APPLICATION_CREDENTIALS)
+const gcs = new Storage({
+  // If you are running locally, you may need to specify the project ID and key file.
+  // On GCP, this is often not needed.
+  // projectId: process.env.GCP_PROJECT_ID,
+  // keyFilename: process.env.GCS_KEYFILE,
 });
+
+// The GCS bucket to which we're uploading files.
+// It's best practice to store this in an environment variable.
+const BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'your-gcs-bucket-name';
+const bucket = gcs.bucket(BUCKET_NAME);
+
+// --- Multer Configuration ---
+// We will use memory storage to process the file as a buffer in memory,
+// then upload it directly to GCS. This avoids writing to disk and is more efficient.
+const storage = multer.memoryStorage();
 
 const upload = multer({ storage: storage });
 
@@ -33,9 +37,6 @@ const VET_ONLY = [authenticate, authorize(['veterinarian'])];
 // POST /api/products
 router.post('/', VENDOR_ONLY, upload.single('image'), async (req, res) => {
   const { name, description, catalog_id } = req.body;
-
-  // The image URL to be saved in the database
-  const image_url = req.file ? `/uploads/products/${req.file.filename}` : null;
 
   if (!name || !catalog_id) {
     return res.status(400).json({ message: 'Product name and catalog_id are required.' });
@@ -49,6 +50,31 @@ router.post('/', VENDOR_ONLY, upload.single('image'), async (req, res) => {
     }
     if (catalog.vendor_id !== req.user.userId) {
       return res.status(403).json({ message: 'Forbidden: You do not own this catalog.' });
+    }
+
+    let image_url = null;
+
+    // If a file is uploaded, handle the GCS upload
+    if (req.file) {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const blobName = `products/${req.file.fieldname}-${uniqueSuffix}${path.extname(req.file.originalname)}`;
+      const blob = bucket.file(blobName);
+
+      const blobStream = blob.createWriteStream({
+        resumable: false,
+      });
+
+      blobStream.on('error', err => res.status(500).json({ message: 'Could not upload image to GCS.', error: err }));
+
+      blobStream.on('finish', async () => {
+        image_url = `https://storage.googleapis.com/${BUCKET_NAME}/${blobName}`;
+        const [id] = await db('products').insert({ name, description, catalog_id, image_url });
+        const [newProduct] = await db('products').where({ id });
+        res.status(201).json(newProduct);
+      });
+
+      blobStream.end(req.file.buffer);
+      return; // End the request here, the blobStream 'finish' event will send the response.
     }
 
     const [id] = await db('products').insert({ name, description, catalog_id, image_url });
@@ -70,11 +96,11 @@ router.delete('/:id', VENDOR_ONLY, async (req, res) => {
   const vendor_id = req.user.userId;
 
   try {
-    // Ownership Check: Join product with catalog to check vendor_id
+    // Ownership Check and get old image URL
     const product = await db('products')
       .join('catalogs', 'products.catalog_id', 'catalogs.id')
       .where('products.id', id)
-      .select('catalogs.vendor_id')
+      .select('catalogs.vendor_id', 'products.image_url')
       .first();
 
     if (!product) {
@@ -82,8 +108,18 @@ router.delete('/:id', VENDOR_ONLY, async (req, res) => {
     } else if (product.vendor_id !== vendor_id) {
       res.status(403).json({ message: 'Forbidden: You do not own this product.' });
     } else {
+      // If the product has an image, delete it from GCS
+      if (product.image_url) {
+        try {
+          const oldImageFilename = product.image_url.split(`${BUCKET_NAME}/`)[1];
+          await bucket.file(oldImageFilename).delete();
+        } catch (err) {
+          console.error("Error deleting product image from GCS during product removal:", err);
+        }
+      }
+
       await db('products').where({ id }).del();
-      res.status(200).json({ message: `Product with id ${id} has been removed.` });
+      res.status(200).json({ message: `Product with id ${id} and its image have been removed.` });
     }
   } catch (error) {
     res.status(500).json({ message: 'Error removing product', error });
@@ -95,12 +131,10 @@ router.delete('/:id', VENDOR_ONLY, async (req, res) => {
 router.put('/:id', VENDOR_ONLY, upload.single('image'), async (req, res) => {
   const { id } = req.params;
   const changes = req.body;
+  delete changes.image_url; // Prevent image_url from being updated directly from body
   const vendor_id = req.user.userId;
 
-  if (req.file) {
-    changes.image_url = `/uploads/products/${req.file.filename}`;
-  }
-  if (!changes.name && !changes.description && !changes.catalog_id && !changes.image_url) {
+  if (Object.keys(changes).length === 0 && !req.file) {
     return res.status(400).json({ message: 'No update information provided.' });
   }
 
@@ -117,12 +151,38 @@ router.put('/:id', VENDOR_ONLY, upload.single('image'), async (req, res) => {
     } else if (product.vendor_id !== vendor_id) {
       res.status(403).json({ message: 'Forbidden: You do not own this product.' });
     } else {
-      // If a new image is uploaded and an old one exists, delete the old one.
-      if (req.file && product.old_image_url) {
-        const oldImagePath = path.join('src/client/public', product.old_image_url);
-        fs.unlink(path.resolve(__dirname, '..', '..', 'client', 'public', product.old_image_url), (err) => {
-          if (err) console.error("Error deleting old product image:", err);
+      // If a new file is uploaded, handle the GCS upload and old image deletion
+      if (req.file) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const blobName = `products/${req.file.fieldname}-${uniqueSuffix}${path.extname(req.file.originalname)}`;
+        const blob = bucket.file(blobName);
+
+        const blobStream = blob.createWriteStream({
+          resumable: false,
         });
+
+        blobStream.on('error', err => res.status(500).json({ message: 'Could not upload image to GCS.', error: err }));
+
+        blobStream.on('finish', async () => {
+          changes.image_url = `https://storage.googleapis.com/${BUCKET_NAME}/${blobName}`;
+
+          // Delete the old image from GCS after the new one is successfully uploaded
+          if (product.old_image_url) {
+            try {
+              const oldImageFilename = product.old_image_url.split(`${BUCKET_NAME}/`)[1];
+              await bucket.file(oldImageFilename).delete();
+            } catch (err) {
+              console.error("Error deleting old product image from GCS:", err);
+            }
+          }
+
+          await db('products').where({ id }).update(changes);
+          const updatedProduct = await db('products').where({ id }).first();
+          res.status(200).json(updatedProduct);
+        });
+
+        blobStream.end(req.file.buffer);
+        return; // End the request here, the blobStream 'finish' event will send the response.
       }
 
       await db('products').where({ id }).update(changes);
