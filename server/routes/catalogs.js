@@ -34,7 +34,8 @@ router.post(
     const access_code = generateCode();
 
     try {
-      const [id] = await db('catalogs').insert({ name, description, vendor_id, access_code });
+      const [idItem] = await db('catalogs').insert({ name, description, vendor_id, access_code }).returning('id');
+      const id = idItem.id || idItem;
       const [newCatalog] = await db('catalogs').where({ id });
       res.status(201).json(newCatalog);
     } catch (error) {

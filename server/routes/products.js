@@ -68,7 +68,8 @@ router.post('/', VENDOR_ONLY, upload.single('image'), async (req, res) => {
 
       blobStream.on('finish', async () => {
         image_url = `https://storage.googleapis.com/${BUCKET_NAME}/${blobName}`;
-        const [id] = await db('products').insert({ name, description, catalog_id, image_url });
+        const [idItem] = await db('products').insert({ name, description, catalog_id, image_url }).returning('id');
+        const id = idItem.id || idItem;
         const [newProduct] = await db('products').where({ id });
         res.status(201).json(newProduct);
       });
@@ -77,7 +78,8 @@ router.post('/', VENDOR_ONLY, upload.single('image'), async (req, res) => {
       return; // End the request here, the blobStream 'finish' event will send the response.
     }
 
-    const [id] = await db('products').insert({ name, description, catalog_id, image_url });
+    const [idItem] = await db('products').insert({ name, description, catalog_id, image_url }).returning('id');
+    const id = idItem.id || idItem;
     const [newProduct] = await db('products').where({ id });
     res.status(201).json(newProduct);
   } catch (error) {
