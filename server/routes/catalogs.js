@@ -143,6 +143,11 @@ router.get('/:id/events', VENDOR_ONLY, async (req, res) => {
   const vendor_id = req.user.userId;
 
   try {
+    // Determine which date formatting function to use based on the DB client
+    const isPostgres = db.client.config.client === 'pg';
+    const dateFn = isPostgres
+      ? `to_char(product_events.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`
+      : `strftime('%Y-%m-%dT%H:%M:%fZ', product_events.created_at)`;
     // 1. Verify ownership of the catalog
     const catalog = await db('catalogs').where({ id: catalog_id, vendor_id }).first();
     if (!catalog) {
@@ -158,7 +163,7 @@ router.get('/:id/events', VENDOR_ONLY, async (req, res) => {
         'products.name as product_name',
         'users.name as user_name',
         'product_events.event_type',
-        db.raw("strftime('%Y-%m-%dT%H:%M:%fZ', product_events.created_at) as created_at"), // Corrected from previous step
+        db.raw(`${dateFn} as created_at`),
         'product_events.message',
         'users.phone_number as user_phone_number'
       )
@@ -176,6 +181,14 @@ router.get('/events', VENDOR_ONLY, async (req, res) => {
   const vendor_id = req.user.userId;
 
   try {
+    // Determine which date formatting function to use based on the DB client
+    const isPostgres = db.client.config.client === 'pg';
+    const productDateFn = isPostgres
+      ? `to_char(product_events.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`
+      : `strftime('%Y-%m-%dT%H:%M:%fZ', product_events.created_at)`;
+    const catalogDateFn = isPostgres
+      ? `to_char(catalog_events.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`
+      : `strftime('%Y-%m-%dT%H:%M:%fZ', catalog_events.created_at)`;
     const productEventsQuery = db('product_events')
       .join('products', 'product_events.product_id', 'products.id')
       .join('catalogs', 'products.catalog_id', 'catalogs.id')
@@ -184,7 +197,7 @@ router.get('/events', VENDOR_ONLY, async (req, res) => {
       .select(
         'product_events.id as id',
         'product_events.event_type as type',
-        db.raw("strftime('%Y-%m-%dT%H:%M:%fZ', product_events.created_at) as created_at"),
+        db.raw(`${productDateFn} as created_at`),
         'products.name as product_name',
         'catalogs.name as catalog_name',
         'users.name as user_name', // Corrected from previous step
@@ -199,7 +212,7 @@ router.get('/events', VENDOR_ONLY, async (req, res) => {
       .select(
         'catalog_events.id as id',
         'catalog_events.event_type as type',
-        db.raw("strftime('%Y-%m-%dT%H:%M:%fZ', catalog_events.created_at) as created_at"),
+        db.raw(`${catalogDateFn} as created_at`),
         db.raw('NULL as product_name'),
         'catalogs.name as catalog_name',
         'users.name as user_name', // Corrected from previous step
